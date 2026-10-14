@@ -80,6 +80,7 @@ export const endpoints = {
   complete: id => `/api/clinical/appointments/${id}/complete/`,
   history: id => `/api/clinical/patient-history/${id}/`,
   consultationSummary: '/api/clinical/get-consultation-summary',
+  consultationSearch: '/api/clinical/consultations/search/',
   addPatientCondition: '/api/clinical/patient-condition/add/',
   meds: '/api/clinical/medications/search/',
   addMed: '/api/clinical/medications/add/',

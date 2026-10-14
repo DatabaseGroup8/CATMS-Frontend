@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus, Search, UserRound } from 'lucide-react';
 import { GET, POST, endpoints } from '../lib/api';
@@ -20,112 +20,121 @@ import {
 import { PatientQuickForm } from './Scheduling';
 import { shortDate, str } from '../lib/utils';
 export default function Patients() {
-  const {
-    user
-  } = useAuth();
+  const { user } = useAuth();
   const [q, setQ] = useState('');
   const [search, setSearch] = useState('');
+  const [page, setPage] = useState(1);
   const [params, setParams] = useSearchParams();
   const [id, setId] = useState(params.get('patient_id') || null);
   const [adding, setAdding] = useState(false);
   const [note, setNote] = useState('');
 
-  // Wait until the receptionist pauses typing before contacting Django.
+  // Fetch even when the search is empty: this shows all accessible patients
+  // alphabetically as soon as the page opens. Debounce typed searches.
   useEffect(() => {
     const timer = setTimeout(() => setSearch(q.trim()), 300);
     return () => clearTimeout(timer);
   }, [q]);
 
-  // useRemote cancels the previous request when the search term changes.
-  const patients = useRemote(endpoints.patients, {
-    q: search
-  }, search.length >= 2);
-  const term = q.trim();
-  const ready = term.length >= 2 && term === search;
+  const patients = useRemote(endpoints.patients, { q: search, page });
+  const ready = q.trim() === search;
+  const rows = patients.data?.data || [];
+  const pages = patients.data?.total_pages ?? 1;
+
   return <>
     <PageHeading
       eyebrow="PATIENT MANAGEMENT"
       title="Patient records"
-      description="Search registered patients and view their records directly from MySQL."
+      description="Browse registered patients alphabetically or find someone instantly by name, contact number or NIC."
       actions={user.role === 'Receptionist' && <Button
         icon={Plus}
         onClick={() => setAdding(true)}
       >Register patient</Button>}
     />
-    <Notice
-      message={note}
-      type="success"
-      onClose={() => setNote('')}
-    />
-    <Panel title="Find a patient" subtitle="Patients appear automatically as you type a name or contact number">
+    <Notice message={note} type="success" onClose={() => setNote('')} />
+    <section className="panel">
+      <div className="panel-body">
       <div className="search-form">
         <div className="search-large">
           <Search size={19} />
           <input
             type="search"
-            aria-label="Search patients by name or contact number"
+            aria-label="Filter patients by name, phone number or NIC"
             value={q}
-            onChange={e => setQ(e.target.value)}
-            placeholder="Start typing patient's name or phone number..."
+            onChange={e => {
+              setQ(e.target.value);
+              setPage(1);
+            }}
+            placeholder="Search by patient name, phone number or NIC (optional)..."
             autoComplete="off"
           />
         </div>
       </div>
-      {term.length < 2
-        ? <div className="hint-block">Type at least 2 characters to search patients.</div>
-        : !ready
-          ? <div className="hint-block" role="status">Searching patients...</div>
-          : <AsyncBlock loading={patients.loading} error={patients.error}>
-            <DataTable rows={patients.data?.data || []} columns={[
-              {
-                key: 'patient_id',
-                label: 'ID'
-              },
-              {
-                key: 'full_name',
-                label: 'Patient name'
-              },
-              {
-                key: 'contact_no',
-                label: 'Contact'
-              },
-              {
-                key: 'age',
-                label: 'Age'
-              },
-              {
-                key: 'action',
-                label: '',
-                render: r => <Button
-                  variant="outline"
-                  onClick={() => {
-                    setId(r.patient_id);
-                    setParams({
-                      patient_id: r.patient_id
-                    });
-                  }}
-                >View record</Button>
-              }
-            ]} />
-          </AsyncBlock>}
-    </Panel>
-    {id && <PatientDetail
-      id={id}
-      onClose={() => {
-        setId(null);
-        setParams({});
-      }}
-    />}
+
+      {!ready
+        ? <div className="hint-block" role="status">Updating patient list...</div>
+        : <AsyncBlock
+            loading={patients.loading}
+            error={patients.error}
+            retry={patients.refresh}
+          >
+            <DataTable
+              rows={rows}
+              empty={q.trim() ? 'No matching patients. Try another name or phone number.' : 'No registered patients found.'}
+              columns={[
+                { key: 'patient_id', label: 'ID' },
+                { key: 'full_name', label: 'Patient name' },
+                { key: 'contact_no', label: 'Contact' },
+                { key: 'age', label: 'Age' },
+                {
+                  key: 'action',
+                  label: '',
+                  render: patient => <Button
+                    variant="outline"
+                    onClick={() => {
+                      setId(patient.patient_id);
+                      setParams({ patient_id: patient.patient_id });
+                    }}
+                  >View record</Button>
+                }
+              ]}
+            />
+            {pages > 1 && <div className="form-footer" style={{ justifyContent: 'space-between', marginTop: 12 }}>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={page <= 1}
+                onClick={() => setPage(p => Math.max(1, p - 1))}
+              >Previous results</Button>
+              <span>Results batch {page} of {pages}</span>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={page >= pages}
+                onClick={() => setPage(p => Math.min(pages, p + 1))}
+              >Next results</Button>
+            </div>}
+          </AsyncBlock>
+      }
+      </div>
+    </section>
+
+    {id && <PatientDetail id={id} onClose={() => {
+      setId(null);
+      setParams({});
+    }} />}
     {adding && <PatientQuickForm
       onClose={() => setAdding(false)}
-      onDone={p => {
+      onDone={patient => {
         setAdding(false);
-        setId(p.patient_id);
+        setId(patient.patient_id);
         setNote('Patient registered successfully');
+        patients.refresh();
       }}
     />}
   </>;
 }
+
 function PatientDetail({
   id,
   onClose
@@ -228,86 +237,178 @@ function PatientDetail({
     </>}
   </Modal>;
 }
-function AddPatientCondition({
-  patientId,
-  onClose
-}) {
-  const categories = useRemote(endpoints.conditions),
-    [form, setForm] = useState({
-      condition_id: '',
-      diagnosed_date: new Date().toISOString().slice(0, 10),
-      is_chronic: false,
-      current_status: 'Active'
-    }),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState('');
-  async function submit(e) {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await POST(endpoints.addPatientCondition, {
-        ...form,
-        patient_id: patientId,
-        condition_id: Number(form.condition_id)
-      });
+function AddPatientCondition({ patientId, onClose, onSaved }) {
+  const categories = useRemote(endpoints.conditions);
+  const nextId = useRef(1);
+  const today = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
+    .toISOString().slice(0, 10);
+
+  const newCondition = (uiId) => ({
+    uiId,
+    condition_id: '',
+    diagnosed_date: today,
+    is_chronic: false,
+    current_status: 'Active',
+    saved: false
+  });
+
+  const [conditions, setConditions] = useState(() => [newCondition(0)]);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [savedCount, setSavedCount] = useState(0);
+
+  const conditionOptions = (categories.data?.data || []).map(item => ({
+    value: item.condition_id,
+    label: item.condition_name
+  }));
+
+  function updateCondition(uiId, field, value) {
+    setConditions(previous => previous.map(item =>
+      item.uiId === uiId && !item.saved
+        ? { ...item, [field]: value }
+        : item
+    ));
+  }
+
+  function addAnother() {
+    setConditions(previous => [...previous, newCondition(nextId.current++)]);
+    setError('');
+  }
+
+  function removeCondition(uiId) {
+    setConditions(previous => previous.filter(item => item.uiId !== uiId));
+  }
+
+  async function submitAll(event) {
+    event.preventDefault();
+    if (busy) return;
+    setError('');
+
+    // A patient can have many different diagnoses, but the same diagnosis
+    // should not be submitted twice for the same date.
+    const submittedKeys = new Set();
+    for (const item of conditions) {
+      if (!item.condition_id || !item.diagnosed_date) {
+        setError('Select a condition and diagnosis date for every row.');
+        return;
+      }
+      const key = `${item.condition_id}|${item.diagnosed_date}`;
+      if (submittedKeys.has(key)) {
+        setError('The same condition and diagnosis date are entered more than once.');
+        return;
+      }
+      submittedKeys.add(key);
+    }
+
+    const pending = conditions.filter(item => !item.saved);
+    if (pending.length === 0) {
       onClose();
-    } catch (e) {
-      setError(e.message);
+      return;
+    }
+
+    setBusy(true);
+    let completed = 0;
+    try {
+      // The current endpoint accepts ONE condition per request.
+      // Send requests in sequence; each one calls AddPatientCondition in MySQL.
+      for (const item of pending) {
+        await POST(endpoints.addPatientCondition, {
+          patient_id: Number(patientId),
+          condition_id: Number(item.condition_id),
+          diagnosed_date: item.diagnosed_date,
+          is_chronic: item.is_chronic,
+          current_status: item.current_status
+        });
+        completed += 1;
+        setSavedCount(previous => previous + 1);
+        setConditions(previous => previous.map(row =>
+          row.uiId === item.uiId ? { ...row, saved: true } : row
+        ));
+      }
+      onSaved?.(savedCount + completed);
+      onClose();
+    } catch (err) {
+      setError(
+        `Unable to save all conditions: ${err.message}. ` +
+        (completed ? `${completed} condition(s) saved in this attempt. ` : '') +
+        'Rows marked Saved have already been committed; retry only the remaining rows.'
+      );
     } finally {
       setBusy(false);
     }
   }
-  return <Modal title="Record diagnosis / condition" onClose={onClose}>
-    <form onSubmit={submit} className="stack">
-      <Notice message={error} type="error" />
-      <Select
-        label="Condition"
-        required
-        value={form.condition_id}
-        onChange={e => setForm(s => ({
-          ...s,
-          condition_id: e.target.value
-        }))}
-        options={(categories.data?.data || []).map(x => ({
-          value: x.condition_id,
-          label: x.condition_name
-        }))}
-      />
-      <Input
-        label="Diagnosis date"
-        required
-        type="date"
-        value={form.diagnosed_date}
-        onChange={e => setForm(s => ({
-          ...s,
-          diagnosed_date: e.target.value
-        }))}
-      />
-      <label className="check-row"><input
-        type="checkbox"
-        checked={form.is_chronic}
-        onChange={e => setForm(s => ({
-          ...s,
-          is_chronic: e.target.checked
-        }))}
-      /> Chronic condition</label>
-      <Select
-        label="Current status"
-        value={form.current_status}
-        onChange={e => setForm(s => ({
-          ...s,
-          current_status: e.target.value
-        }))}
-        options={['Active', 'Resolved', 'Under Treatment']}
-      />
-      <div className="form-footer">
-        <Button
-          type="button"
-          variant="outline"
-          onClick={onClose}
-        >Cancel</Button>
-        <Button type="submit" loading={busy}>Save condition</Button>
-      </div>
-    </form>
-  </Modal>;
+
+  return (
+    <Modal title="Record diagnoses / conditions" onClose={onClose} wide>
+      <form onSubmit={submitAll} className="stack">
+        <p style={{ margin: 0, color: 'var(--muted, #64748b)' }}>
+          Record several conditions for this patient in one form. Each row is
+          saved as its own patient-condition record.
+        </p>
+        <Notice message={error} type="error" onClose={() => setError('')} />
+        {conditions.map((item, index) => (
+          <div
+            key={item.uiId}
+            style={{ border: '1px solid #dce6ed', borderRadius: 12, padding: 16 }}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12, gap: 12 }}>
+              <strong>Condition {index + 1}</strong>
+              {item.saved ? (
+                <span style={{ color: '#0d947d', fontWeight: 700 }}>Saved</span>
+              ) : conditions.length > 1 ? (
+                <Button type="button" variant="outline" disabled={busy} onClick={() => removeCondition(item.uiId)}>
+                  Remove
+                </Button>
+              ) : null}
+            </div>
+            <div className="stack">
+              <Select
+                label="Condition"
+                required
+                disabled={busy || item.saved}
+                value={item.condition_id}
+                onChange={e => updateCondition(item.uiId, 'condition_id', e.target.value)}
+                options={conditionOptions}
+              />
+              <Input
+                label="Diagnosis date"
+                required
+                type="date"
+                disabled={busy || item.saved}
+                value={item.diagnosed_date}
+                onChange={e => updateCondition(item.uiId, 'diagnosed_date', e.target.value)}
+              />
+              <label className="check-row">
+                <input
+                  type="checkbox"
+                  disabled={busy || item.saved}
+                  checked={item.is_chronic}
+                  onChange={e => updateCondition(item.uiId, 'is_chronic', e.target.checked)}
+                />
+                Chronic condition
+              </label>
+              <Select
+                label="Current status"
+                disabled={busy || item.saved}
+                value={item.current_status}
+                onChange={e => updateCondition(item.uiId, 'current_status', e.target.value)}
+                options={['Active', 'Resolved', 'Under Treatment']}
+              />
+            </div>
+          </div>
+        ))}
+        <Button type="button" variant="outline" disabled={busy} onClick={addAnother}>
+          + Add another condition
+        </Button>
+        <div className="form-footer">
+          <Button type="button" variant="outline" disabled={busy} onClick={onClose}>
+            Close
+          </Button>
+          <Button type="submit" loading={busy} disabled={!conditions.some(item => !item.saved)}>
+            Save all conditions
+          </Button>
+        </div>
+      </form>
+    </Modal>
+  );
 }
