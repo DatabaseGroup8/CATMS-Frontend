@@ -8,17 +8,17 @@
 
 ## Team Contributions
 
-Development was collaborative. The table below identifies contributions **supported by the Git commits available in the submitted project snapshot**; a commit identifies submitted changes, not exclusive authorship of the entire feature. Members should check their names and add any later commits before submission.
+Development was collaborative across the interface, backend, and database. The contribution areas below summarize each member's work; some responsibilities were shared across members. Team members should review these descriptions before submission.
 
-| Contributor / Git author | Documented frontend contributions | Git evidence |
-| --- | --- | --- |
-| **Shanuka Rathnayake** (`ShanukaRathnayake`) | Frontend project setup and configuration; API endpoint catalogue and request integration; appointment-management interface; consultation/billing and clinical catalogue pages. | [`90d2145`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/90d2145), [`0cacad5`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/0cacad5) |
-| **Mus'ab Arafath** (`Mus'ab Arafath`) | Authentication context and shared login state; staff registration interface; appointment scheduling page; management report page. | [`fcca83b`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/fcca83b), [`b499392`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/b499392), [`43aa72a`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/43aa72a), [`8e22766`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/8e22766) |
-| **Lasanthan-Km** (full name to confirm) | Application routes and role-based route guards; React entry point; responsive styling; shared formatting and CSV-export utilities. | [`24b8c96`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/24b8c96), [`74bbab3`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/74bbab3), [`96b4751`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/96b4751) |
-| **Devindi Wickramarathna** (`Devindi Wickramarathna`) | Main app layout/navigation; dashboard; doctor workflow screens; insurance management interface. | [`5c625bf`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/5c625bf) |
-| **Pabodha Gamaethige** (`pabodhagamaethige-jpg`; full name to confirm) | Reusable UI components; login page; patient-record interface; invoices and payment interface. | [`e8a8f2e`](https://github.com/DatabaseGroup8/CATMS-Frontend/commit/e8a8f2e) |
+| Team member | Frontend contribution areas |
+| --- | --- |
+| **Shanuka Rathnayake** | Frontend project setup and configuration; API endpoint catalogue and request integration; appointment-management interface; consultation/billing and clinical catalogue pages. |
+| **Mus'ab Arafath** | Authentication context and shared login state; staff registration interface; appointment scheduling page; management report page. |
+| **Lasanthan-Km** | Application routes and role-based route guards; React entry point; responsive styling; shared formatting and CSV-export utilities. |
+| **Devindi Wickramarathna** | Main app layout/navigation; dashboard; doctor workflow screens; insurance management interface. |
+| **Pabodha Gamaethige** | Reusable UI components; login page; patient-record interface; invoices and payment interface. |
 
-The backend's database procedures, security validation and transactional operations are implemented in the [backend repository](https://github.com/DatabaseGroup8/CATMS-Backend), not in React. Frontend authorship and backend/database authorship should be evaluated separately.
+The backend's database procedures, security validation and transactional operations are implemented in the [backend repository](https://github.com/DatabaseGroup8/CATMS-Backend), not in React. Frontend and backend/database work are summarized separately.
 
 ## Functional Overview
 
